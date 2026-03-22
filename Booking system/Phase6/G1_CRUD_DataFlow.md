@@ -64,12 +64,12 @@ sequenceDiagram
     alt Query success
         DB-->>B: rows[]
         B-->>F: 200\n{ ok:true, data:[...] }
-        F->>F: resourcesCache = body.data; renderResourceList(...)
+        F->>F: Save body.data to cache and render resource list
         F-->>U: Updated resource list is displayed
     else Query fails
         DB-->>B: SQL error
         B-->>F: 500\n{ ok:false, error:"Database error" }
-        F->>F: console.error(...); renderResourceList([])
+        F->>F: Log error and render empty list
         F-->>U: Empty/fallback list state
     end
 
