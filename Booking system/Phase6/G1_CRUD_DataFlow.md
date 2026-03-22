@@ -1,13 +1,13 @@
 # G1 - CRUD Data Flow (Phase6 Booking System)
 
-This document models the actual CRUD request/response flow implemented in Phase6.
+This file models the implemented Phase6 flow (frontend -> API route -> DB -> response).
 
-Observed implementation sources:
+Implementation references:
 - Frontend: public/resources.js, public/form.js
-- Backend API: src/routes/resources.routes.js
+- Routes: src/routes/resources.routes.js
 - Validation: src/validators/resource.validators.js
-- Service layer: src/services/log.service.js
-- Database schema: db/init/001_create_resources.sql, db/init/002_create_logs.sql
+- Service: src/services/log.service.js
+- DB schema: db/init/001_create_resources.sql, db/init/002_create_logs.sql
 
 ## CREATE (C) - POST /api/resources
 
@@ -19,30 +19,30 @@ sequenceDiagram
     participant S as Service (log.service.js)
     participant DB as PostgreSQL
 
-    U->>F: Fill form and click Create
-    F->>F: Client-side validation (name/description format + length)
-    F->>B: POST /api/resources\nJSON body: resourceName, resourceDescription, resourceAvailable, resourcePrice, resourcePriceUnit
-    B->>B: express-validator checks request body
+    U->>F: Submit Create form
+    F->>F: Client-side checks (name/description format + length)
+    F->>B: POST /api/resources\nBody: {resourceName, resourceDescription, resourceAvailable, resourcePrice, resourcePriceUnit}
+    B->>B: validationResult(resourceValidators)
 
-    alt Validation fails
-        B-->>F: 400 Bad Request\n{ ok:false, errors:[...] }
-        F-->>U: Show validation errors in form message
+    alt Server validation fails
+        B-->>F: 400\n{ ok:false, errors:[{field,msg}, ...] }
+        F-->>U: Show field-level validation error message
     else Validation passes
         B->>DB: INSERT INTO resources (...) RETURNING ...
 
-        alt Duplicate resource name (unique index)
+        alt Duplicate name (unique index on LOWER(name))
             DB-->>B: error code 23505
             B->>S: logEvent("Duplicate resource blocked (...)")
             S->>DB: INSERT INTO booking_log (...)
-            B-->>F: 409 Conflict\n{ ok:false, error:"Duplicate resource name" }
-            F-->>U: Show duplicate conflict message
+            B-->>F: 409\n{ ok:false, error:"Duplicate resource name" }
+            F-->>U: Show duplicate-name error
         else Insert success
-            DB-->>B: Inserted row
+            DB-->>B: Created row
             B->>S: logEvent("Resource created (ID ...)")
             S->>DB: INSERT INTO booking_log (...)
-            B-->>F: 201 Created\n{ ok:true, data:{...} }
-            F->>F: onResourceActionSuccess() -> reload list
-            F-->>U: Show success message and refreshed resource list
+            B-->>F: 201\n{ ok:true, data:{...} }
+            F->>F: onResourceActionSuccess() -> clear form + loadResources()
+            F-->>U: Show create success message + refreshed list
         end
     end
 ```
@@ -57,23 +57,23 @@ sequenceDiagram
     participant S as Service (log.service.js)
     participant DB as PostgreSQL
 
-    U->>F: Open resources page / trigger refresh
+    U->>F: Open /resources (or refresh after C/U/D)
     F->>B: GET /api/resources
     B->>DB: SELECT * FROM resources ORDER BY created_at DESC
 
     alt Query success
-        DB-->>B: Rows
-        B-->>F: 200 OK\n{ ok:true, data:[...] }
-        F->>F: resourcesCache = data; renderResourceList(data)
-        F-->>U: Resource list displayed/updated
-    else Database error
+        DB-->>B: rows[]
+        B-->>F: 200\n{ ok:true, data:[...] }
+        F->>F: resourcesCache = body.data; renderResourceList(...)
+        F-->>U: Updated resource list is displayed
+    else Query fails
         DB-->>B: SQL error
-        B-->>F: 500 Internal Server Error\n{ ok:false, error:"Database error" }
-        F->>F: console.error("Failed to load resources", ...)
-        F-->>U: Empty list/fallback state
+        B-->>F: 500\n{ ok:false, error:"Database error" }
+        F->>F: console.error(...); renderResourceList([])
+        F-->>U: Empty/fallback list state
     end
 
-    Note over S: No service-layer logging call is used in current READ ALL route.
+    Note over S: No logEvent() call in READ ALL route.
 ```
 
 ## UPDATE (U) - PUT /api/resources/:id
@@ -86,36 +86,39 @@ sequenceDiagram
     participant S as Service (log.service.js)
     participant DB as PostgreSQL
 
-    U->>F: Select resource, edit fields, click Update
-    F->>F: Client-side validation + changed-field check
+    U->>F: Select item, edit fields, click Update
+    F->>F: Client-side validation + changed-state check
 
-    alt Missing ID in frontend state
+    alt Missing selected resourceId in form
         F-->>U: "Update failed: missing resource ID"
-    else ID exists
-        F->>B: PUT /api/resources/:id\nJSON body with updated fields
-        B->>B: Parse :id and run express-validator
+    else resourceId exists
+        F->>B: PUT /api/resources/:id\nBody with edited fields
+        B->>B: Parse id + run resourceValidators
 
-        alt Invalid ID or validation fails
-            B-->>F: 400 Bad Request\n{ ok:false, error|errors }
-            F-->>U: Show validation/invalid input message
-        else Validation passes
+        alt Invalid id (NaN)
+            B-->>F: 400\n{ ok:false, error:"Invalid ID" }
+            F-->>U: Generic 400 message (frontend expects errors[])
+        else Validation errors
+            B-->>F: 400\n{ ok:false, errors:[{field,msg}, ...] }
+            F-->>U: Field-level validation message
+        else Validation OK
             B->>DB: UPDATE resources SET ... WHERE id=$6 RETURNING *
 
-            alt Resource not found
-                DB-->>B: 0 rows updated
-                B-->>F: 404 Not Found\n{ ok:false, error:"Resource not found" }
-                F-->>U: Show not-found message
-            else Duplicate name conflict
-                DB-->>B: error code 23505
-                B-->>F: 409 Conflict\n{ ok:false, error:"Duplicate resource name" }
-                F-->>U: Show duplicate conflict message
+            alt No row updated
+                DB-->>B: rows.length = 0
+                B-->>F: 404\n{ ok:false, error:"Resource not found" }
+                F-->>U: Not-found message
+            else Duplicate name (23505)
+                DB-->>B: unique constraint error
+                B-->>F: 409\n{ ok:false, error:"Duplicate resource name" }
+                F-->>U: Duplicate-name message
             else Update success
                 DB-->>B: Updated row
                 B->>S: logEvent("Resource updated (ID ...)")
                 S->>DB: INSERT INTO booking_log (...)
-                B-->>F: 200 OK\n{ ok:true, data:{...} }
-                F->>F: onResourceActionSuccess() -> reset form + reload list
-                F-->>U: Show success message and updated list
+                B-->>F: 200\n{ ok:true, data:{...} }
+                F->>F: onResourceActionSuccess() -> clear form + loadResources()
+                F-->>U: Updated list + success message
             end
         end
     end
@@ -131,65 +134,62 @@ sequenceDiagram
     participant S as Service (log.service.js)
     participant DB as PostgreSQL
 
-    U->>F: Select resource and click Delete
+    U->>F: Select item and click Delete
 
-    alt Missing ID in frontend state
+    alt Missing selected resourceId in form
         F-->>U: "Delete failed: missing resource ID"
-    else ID exists
+    else resourceId exists
         F->>B: DELETE /api/resources/:id
-        B->>B: Parse :id
+        B->>B: Parse id
 
-        alt Invalid ID
-            B-->>F: 400 Bad Request\n{ ok:false, error:"Invalid ID" }
-            F-->>U: Show error message
-        else ID is valid
+        alt Invalid id (NaN)
+            B-->>F: 400\n{ ok:false, error:"Invalid ID" }
+            F-->>U: Error message
+        else Valid id
             B->>DB: DELETE FROM resources WHERE id=$1
 
-            alt Resource not found
-                DB-->>B: rowCount = 0
-                B-->>F: 404 Not Found\n{ ok:false, error:"Resource not found" }
-                F-->>U: Show not-found message
-            else Delete success
-                DB-->>B: rowCount = 1
+            alt rowCount = 0
+                DB-->>B: Not found
+                B-->>F: 404\n{ ok:false, error:"Resource not found" }
+                F-->>U: Not-found message
+            else rowCount = 1
+                DB-->>B: Deleted
                 B->>S: logEvent("Resource deleted (ID ...)")
                 S->>DB: INSERT INTO booking_log (...)
                 B-->>F: 204 No Content
-                F->>F: onResourceActionSuccess() -> reset form + reload list
-                F-->>U: Show delete success message and refreshed list
+                F->>F: onResourceActionSuccess() -> clear form + loadResources()
+                F-->>U: Delete success + refreshed list
             end
         end
     end
 ```
 
-## Endpoint Summary (Phase6)
+## Endpoint/Status Summary
 
-| CRUD | Method | Endpoint | Success status | Example failure statuses seen in code |
+| CRUD | Method | Endpoint | Success | Failure paths implemented |
 |---|---|---|---|---|
 | Create | POST | /api/resources | 201 | 400, 409, 500 |
-| Read all | GET | /api/resources | 200 | 500 |
-| Read one | GET | /api/resources/:id | 200 | 400, 404, 500 |
+| Read (used by UI) | GET | /api/resources | 200 | 500 |
+| Read one (route exists) | GET | /api/resources/:id | 200 | 400, 404, 500 |
 | Update | PUT | /api/resources/:id | 200 | 400, 404, 409, 500 |
 | Delete | DELETE | /api/resources/:id | 204 | 400, 404, 500 |
 
-## Runtime Verification Notes (2026-03-22)
+## Runtime Verification (2026-03-22)
 
-Deployment status:
-- Docker stack started successfully with `docker compose up -d --build`
-- Web container: `booking-system-phase6-web` (port 5000)
-- DB container: `booking-system-phase6-db` (port 5432)
+Environment:
+- docker compose up -d --build: success
+- booking-system-phase6-web listening on port 5000
+- booking-system-phase6-db initialized and running on 5432
 
-Observed API calls and responses:
+Observed requests (real run):
 
-| Operation | Request | Observed status | Observed response (short) |
+| Scenario | Request | Status | Response shape |
 |---|---|---|---|
-| Read all (success) | GET /api/resources | 200 | `{ "ok": true, "data": [...] }` |
-| Create (validation fail) | POST /api/resources (invalid body) | 400 | `{ "ok": false, "errors": [...] }` |
-| Create (success) | POST /api/resources | 201 | `{ "ok": true, "data": { "id": 3, ... } }` |
-| Create (duplicate fail) | POST /api/resources (same name) | 409 | `{ "ok": false, "error": "Duplicate resource name" }` |
-| Update (success) | PUT /api/resources/3 | 200 | `{ "ok": true, "data": {...} }` |
-| Update (not found fail) | PUT /api/resources/999999 | 404 | `{ "ok": false, "error": "Resource not found" }` |
-| Delete (success) | DELETE /api/resources/3 | 204 | no content |
-| Delete (not found fail) | DELETE /api/resources/3 (again) | 404 | `{ "ok": false, "error": "Resource not found" }` |
-
-Note:
-- The same endpoints/status patterns are what should appear in Browser DevTools Network tab during UI actions.
+| Read success | GET /api/resources | 200 | { ok:true, data:[...] } |
+| Create validation fail | POST /api/resources | 400 | { ok:false, errors:[...] } |
+| Create success | POST /api/resources | 201 | { ok:true, data:{ id, ... } } |
+| Create duplicate fail | POST /api/resources (same name) | 409 | { ok:false, error:"Duplicate resource name" } |
+| Update success | PUT /api/resources/3 | 200 | { ok:true, data:{...} } |
+| Update not found fail | PUT /api/resources/999999 | 404 | { ok:false, error:"Resource not found" } |
+| Delete success | DELETE /api/resources/3 | 204 | no body |
+| Delete not found fail | DELETE /api/resources/3 again | 404 | { ok:false, error:"Resource not found" } |
