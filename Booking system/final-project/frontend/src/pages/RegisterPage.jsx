@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { z } from "zod";
 
-// --- Schema Definitions ---
 const registerSchema = z
   .object({
     firstName: z
@@ -81,14 +80,11 @@ function RegisterPage({ showToast }) {
   const [isFormValid, setIsFormValid] = useState(false);
 
   const [successMessage, setSuccessMessage] = useState("");
-  const [apiResponse, setApiResponse] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Password show/hide
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // Password strength
   function getPasswordStrength(password) {
     let score = 0;
     if (!password) return 0;
@@ -111,7 +107,6 @@ function RegisterPage({ showToast }) {
     "Excellent"
   ][passwordStrength] || "Very Weak";
 
-  // --- Custom Calendar State ---
   const today = new Date();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const calendarRef = useRef(null);
@@ -187,7 +182,6 @@ function RegisterPage({ showToast }) {
     if (!isFormValid) return;
 
     setSuccessMessage("");
-    setApiResponse(null);
     setLoading(true);
 
     const finalResult = registerSchema.safeParse(formData);
@@ -220,7 +214,6 @@ function RegisterPage({ showToast }) {
          throw new Error(data.error || "Registration failed");
       }
 
-      setApiResponse(data);
       setSuccessMessage("Account created successfully. You can sign in now.");
       showToast?.("Account created successfully.", "success");
     } catch (error) {
@@ -391,7 +384,6 @@ function RegisterPage({ showToast }) {
                   )}
                 </button>
               </div>
-              {/* Password strength meter */}
               <div className="mt-2">
                 <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div

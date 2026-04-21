@@ -5,18 +5,15 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
-// Import Routers
 import resourcesRouter from "./src/routes/resources.routes.js";
 import reservationsRouter from "./src/routes/reservations.routes.js";
 import authRoutes from "./src/routes/auth.routes.js";
 import { requireAuth } from "./middleware/auth.middleware.js";
 import { runMigrations } from "./src/db/migrate.js";
 
-// Needed in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load .env from project root
 dotenv.config({
   path: path.resolve(__dirname, "../.env"),
 });
@@ -80,7 +77,6 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true, message: "API is running" });
 });
 
-// Phase7 API Routers
 app.use("/api/resources", resourcesRouter);
 app.use("/api/reservations", requireAuth, reservationsRouter);
 app.use("/api/auth", rateLimit({ windowMs: 60 * 1000, max: 20 }), authRoutes);

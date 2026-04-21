@@ -16,7 +16,6 @@ import ServerErrorPage from './pages/ServerErrorPage.jsx';
 function App() {
   const [toast, setToast] = useState(null);
 
-  // Simple toast system
   const showToast = useCallback((msg, type = 'info', ms = 3000) => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), ms);

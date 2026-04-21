@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
@@ -94,7 +94,7 @@ function ResourcesPage({ showToast }) {
     : null;
   const minBookingTime = toDateTimeLocal(new Date(Date.now() + 5 * 60000));
 
-  const fetchResources = async () => {
+  const fetchResources = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch("/api/resources", {
@@ -117,11 +117,11 @@ function ResourcesPage({ showToast }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     fetchResources();
-  }, []);
+  }, [fetchResources]);
 
   const handleCreateResource = async (e) => {
     e.preventDefault();

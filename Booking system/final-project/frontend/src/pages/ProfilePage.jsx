@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 
 const profileSchema = z.object({
@@ -28,7 +28,7 @@ function ProfilePage({ showToast }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [passwordErrors, setPasswordErrors] = useState({});
 
-  async function loadProfile() {
+  const loadProfile = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch("/api/profile", {
@@ -55,11 +55,11 @@ function ProfilePage({ showToast }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [showToast]);
 
   useEffect(() => {
     loadProfile();
-  }, []);
+  }, [loadProfile]);
 
   const handleProfileChange = (event) => {
     const next = { ...profile, [event.target.name]: event.target.value };

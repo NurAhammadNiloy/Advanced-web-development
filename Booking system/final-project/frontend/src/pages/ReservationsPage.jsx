@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 function ReservationsPage({ showToast }) {
@@ -9,7 +9,7 @@ function ReservationsPage({ showToast }) {
   const [page, setPage] = useState(1);
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  async function fetchReservations() {
+  const fetchReservations = useCallback(async () => {
       setLoading(true);
       try {
         const response = await fetch("/api/reservations", {
@@ -32,11 +32,11 @@ function ReservationsPage({ showToast }) {
       } finally {
         setLoading(false);
       }
-  }
+  }, [showToast]);
 
   useEffect(() => {
     fetchReservations();
-  }, []);
+  }, [fetchReservations]);
 
   async function cancelReservation(id) {
     if (!window.confirm("Cancel this reservation?")) return;
