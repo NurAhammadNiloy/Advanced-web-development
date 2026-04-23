@@ -9,10 +9,18 @@ const role = "admin"; // "reserver" | "admin"
 
 // Will hold a reference to the Create button so we can enable/disable it
 let createButton = null;
+let updateButton = null;
+let deleteButton = null;
 
 // Resource name and description validation status
 let resourceNameValid = false
 let resourceDescriptionValid = false
+
+const RESOURCE_TEXT_PATTERN = /^[a-zA-Z0-9äöåÄÖÅ ]+$/;
+
+function normalizeWhitespace(value) {
+  return value.trim().replace(/\s+/g, " ");
+}
 
 // ===============================
 // 2) Button creation helpers
@@ -66,6 +74,7 @@ function renderActionButtons(currentRole) {
     createButton = addButton({
       label: "Create",
       type: "submit",
+      value: "create",
       classes: BUTTON_ENABLED_CLASSES,
     });
   }
@@ -80,12 +89,14 @@ function renderActionButtons(currentRole) {
 
     updateButton = addButton({
       label: "Update",
+      type: "button",
       value: "update",
       classes: BUTTON_ENABLED_CLASSES,
     });
 
     deleteButton = addButton({
       label: "Delete",
+      type: "button",
       value: "delete",
       classes: BUTTON_ENABLED_CLASSES,
     });
@@ -122,25 +133,19 @@ function createResourceNameInput(container) {
 }
 
 function isResourceNameValid(value) {
-  const trimmed = value.trim();
+  const normalized = normalizeWhitespace(value);
 
-  // Allowed: letters, numbers, Finnish letters, and space (based on your current regex)
-  const allowedPattern = /^[a-zA-Z0-9äöåÄÖÅ ]+$/;
-
-  const lengthValid = trimmed.length >= 5 && trimmed.length <= 30;
-  const charactersValid = allowedPattern.test(trimmed);
+  const lengthValid = normalized.length >= 5 && normalized.length <= 30;
+  const charactersValid = RESOURCE_TEXT_PATTERN.test(normalized);
 
   return lengthValid && charactersValid;
 }
 
 function isResourceDescriptionValid(value) {
-  const trimmed = value.trim();
+  const normalized = normalizeWhitespace(value);
 
-  // Allowed: letters, numbers, Finnish letters, and space (based on your current regex)
-  const allowedPattern = /^[a-zA-Z0-9äöåÄÖÅ ]+$/;
-
-  const lengthValid = trimmed.length >= 10 && trimmed.length <= 50;
-  const charactersValid = allowedPattern.test(trimmed);
+  const lengthValid = normalized.length >= 10 && normalized.length <= 50;
+  const charactersValid = RESOURCE_TEXT_PATTERN.test(normalized);
 
   return lengthValid && charactersValid;
 }
@@ -197,6 +202,7 @@ function attachResourceNameValidation(input) {
     const raw = input.value;
     if (raw.trim() === "") {
       setInputVisualState(input, "neutral");
+      resourceNameValid = false;
       setButtonEnabled(createButton, false);
       return;
     }
@@ -221,6 +227,7 @@ function attachResourceDescriptionValidation(input) {
     const raw = input.value;
     if (raw.trim() === "") {
       setInputVisualState(input, "neutral");
+      resourceDescriptionValid = false;
       setButtonEnabled(createButton, false);
       return;
     }
