@@ -14,6 +14,10 @@ function timestamp() {
   return now.toISOString().replace('T', ' ').replace('Z', '');
 }
 
+function normalizeWhitespace(value) {
+  return String(value ?? "").trim().replace(/\s+/g, " ");
+}
+
 // -------------- Form wiring --------------
 document.addEventListener("DOMContentLoaded", () => {
   const form = $("resourceForm");
@@ -30,8 +34,8 @@ async function onSubmit(event) {
 
   const payload = {
     action: actionValue,
-    resourceName: $("resourceName")?.value ?? "",
-    resourceDescription: $("resourceDescription")?.value ?? "",
+    resourceName: normalizeWhitespace($("resourceName")?.value ?? ""),
+    resourceDescription: normalizeWhitespace($("resourceDescription")?.value ?? ""),
     resourceAvailable: $("resourceAvailable")?.checked ?? false,
     resourcePrice,
     resourcePriceUnit: selectedUnit
@@ -49,16 +53,18 @@ async function onSubmit(event) {
       body: JSON.stringify(payload)
     });
 
+    const resp = await response.json();
     if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`HTTP ${response.status} ${response.statusText}\n${text}`);
+      const messages = Array.isArray(resp.errors)
+        ? resp.errors.map((error) => `${error.field}: ${error.msg}`).join("\n")
+        : (resp.error || "Request failed");
+      throw new Error(`HTTP ${response.status} ${response.statusText}\n${messages}`);
     }
 
     // Creates an alert and a log message
-    const resp = await response.json();
     const created_at =resp.data.created_at.replace('T', ' ').replace('Z', '');
     
-    msg = "Name ➡️ "+ resp.data.name + "\n";
+    let msg = "Name ➡️ "+ resp.data.name + "\n";
     msg += "Created at ➡️ " + created_at + "\n";
     msg += "ID in database ➡️ "+ resp.data.id + "\n";
 
@@ -77,5 +83,6 @@ async function onSubmit(event) {
 
   } catch (err) {
     console.error("POST error:", err);
+    alert(err.message);
   }
 }
